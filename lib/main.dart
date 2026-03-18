@@ -3,6 +3,32 @@ import 'package:flutter/material.dart';
 import 'streak_service.dart';
 import 'streak_model.dart';
 
+// top level so it's not recreated every build
+Color getBadgeColor(String badge) {
+  switch (badge) {
+    case 'Absolute Giga Chad':
+      return const Color(0xFF00BFFF);
+    case 'Giga Chad':
+      return const Color(0xFF39FF14);
+    case 'Absolute Chad':
+      return const Color(0xFFFF9500);
+    case 'Chad':
+      return const Color(0xFFFFD700);
+    case 'Sigma':
+      return const Color(0xFF4A9EFF);
+    case 'Advanced':
+      return const Color(0xFFC0C0C0);
+    case 'Average':
+      return const Color(0xFFCD7F32);
+    case 'Novice':
+      return const Color(0xFFAAAAAA);
+    case 'Noob':
+      return const Color(0xFF888888);
+    default:
+      return const Color(0xFFFF3131);
+  }
+}
+
 void main() {
   runApp(const MyApp());
 }
@@ -191,24 +217,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _minutes = 0;
   int _seconds = 0;
   String _currentBadge = 'Clown';
-  String _previousBadge = 'Clown';
 
-  // panel animation
+  // panel
   late AnimationController _panelController;
   late Animation<Offset> _panelSlide;
   bool _panelOpen = false;
 
-  // badge unlock animation
+  // badge unlock animation only
   late AnimationController _badgeController;
   late Animation<double> _badgeScale;
   late Animation<double> _badgeFade;
 
-  // ring animation
-  late AnimationController _ringController;
-  late Animation<double> _ringValue;
-  double _targetProgress = 0;
-
-  final List<Map<String, dynamic>> _badges = [
+  final List<Map<String, dynamic>> _badges = const [
     {'name': 'Clown', 'days': 0, 'image': 'assets/badges/clown.png'},
     {'name': 'Noob', 'days': 1, 'image': 'assets/badges/noob.png'},
     {'name': 'Novice', 'days': 3, 'image': 'assets/badges/novice.png'},
@@ -233,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    // panel
     _panelController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -243,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           CurvedAnimation(parent: _panelController, curve: Curves.easeInOut),
         );
 
-    // badge unlock
     _badgeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -256,29 +274,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       end: 1.0,
     ).animate(CurvedAnimation(parent: _badgeController, curve: Curves.easeIn));
 
-    // ring
-    _ringController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _ringValue = Tween<double>(
-      begin: 0,
-      end: 0,
-    ).animate(CurvedAnimation(parent: _ringController, curve: Curves.easeOut));
-
     _badgeController.forward();
     _loadStreak();
-  }
-
-  void _animateRingTo(double target) {
-    final current = _ringValue.value;
-    _ringValue = Tween<double>(
-      begin: current,
-      end: target,
-    ).animate(CurvedAnimation(parent: _ringController, curve: Curves.easeOut));
-    _ringController
-      ..reset()
-      ..forward();
   }
 
   void _openPanel() {
@@ -288,13 +285,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _closePanel() {
     _panelController.reverse().then((_) {
-      setState(() => _panelOpen = false);
+      if (mounted) setState(() => _panelOpen = false);
     });
   }
 
   Future<void> _loadStreak() async {
     final running = await _service.isStreakRunning();
     final start = await _service.loadStartTime();
+    if (!mounted) return;
     setState(() {
       _isRunning = running;
       _startTime = start;
@@ -305,26 +303,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _startTicking() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_startTime == null) return;
+      if (!mounted || _startTime == null) return;
       final diff = DateTime.now().difference(_startTime!);
       final newDays = diff.inDays;
       final newBadge = _service.getCurrentBadge(newDays);
-      final newProgress = newDays >= 365
-          ? 1.0
-          : (newDays / 365).clamp(0.0, 1.0);
 
-      // badge unlock animation
       if (newBadge != _currentBadge) {
-        _previousBadge = _currentBadge;
         _badgeController
           ..reset()
           ..forward();
-      }
-
-      // ring animation only when progress changes
-      if (newProgress != _targetProgress) {
-        _targetProgress = newProgress;
-        _animateRingTo(_targetProgress);
       }
 
       setState(() {
@@ -340,6 +327,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _handleStart() async {
     await _service.startStreak();
     final start = await _service.loadStartTime();
+    if (!mounted) return;
     setState(() {
       _isRunning = true;
       _startTime = start;
@@ -352,7 +340,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _badgeController
       ..reset()
       ..forward();
-    _animateRingTo(0);
     _startTicking();
   }
 
@@ -417,6 +404,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         daysReached: _days,
       );
       _timer?.cancel();
+      if (!mounted) return;
       setState(() {
         _isRunning = false;
         _days = 0;
@@ -426,7 +414,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _currentBadge = 'Clown';
         _startTime = null;
       });
-      _animateRingTo(0);
       _badgeController
         ..reset()
         ..forward();
@@ -439,41 +426,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _panelController.dispose();
     _badgeController.dispose();
-    _ringController.dispose();
     super.dispose();
-  }
-
-  // badge ring color based on rank
-  Color _getBadgeColor(String badge) {
-    switch (badge) {
-      case 'Absolute Giga Chad':
-        return const Color(0xFF00BFFF);
-      case 'Giga Chad':
-        return const Color(0xFF39FF14);
-      case 'Absolute Chad':
-        return const Color(0xFFFF9500);
-      case 'Chad':
-        return const Color(0xFFFFD700);
-      case 'Sigma':
-        return const Color(0xFF4A9EFF);
-      case 'Advanced':
-        return const Color(0xFFC0C0C0);
-      case 'Average':
-        return const Color(0xFFCD7F32);
-      case 'Novice':
-        return const Color(0xFFAAAAAA);
-      case 'Noob':
-        return const Color(0xFF888888);
-      default:
-        return const Color(0xFFFF3131);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final badgeImage = _service.getBadgeImage(_currentBadge);
     final screenWidth = MediaQuery.of(context).size.width;
-    final accentColor = _getBadgeColor(_currentBadge);
+    final accentColor = getBadgeColor(_currentBadge);
+
+    // progress values
+    final dayProgress = _days >= 365 ? 1.0 : (_days / 365).clamp(0.0, 1.0);
+    final hourProgress = _hours / 24.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
@@ -495,7 +459,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
-
       body: Stack(
         children: [
           // ── MAIN CONTENT
@@ -505,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // ── BADGE CARD with unlock animation
+                  // ── BADGE CARD
                   FadeTransition(
                     opacity: _badgeFade,
                     child: ScaleTransition(
@@ -520,13 +483,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             color: accentColor.withOpacity(0.3),
                             width: 1,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accentColor.withOpacity(0.1),
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                            ),
-                          ],
                         ),
                         child: Column(
                           children: [
@@ -577,25 +533,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                   const SizedBox(height: 40),
 
-                  // ── ANIMATED CIRCULAR TIMER
-                  AnimatedBuilder(
-                    animation: _ringValue,
-                    builder: (context, child) {
-                      return Stack(
+                  // ── DOUBLE RING TIMER (days outer, hours inner)
+                  RepaintBoundary(
+                    child: SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: Stack(
                         alignment: Alignment.center,
                         children: [
+                          // outer ring — days progress
                           SizedBox(
-                            width: 200,
-                            height: 200,
+                            width: 220,
+                            height: 220,
                             child: CircularProgressIndicator(
-                              value: _ringValue.value,
-                              strokeWidth: 6,
+                              value: dayProgress,
+                              strokeWidth: 7,
                               backgroundColor: const Color(0xFF222222),
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 accentColor,
                               ),
                             ),
                           ),
+                          // inner ring — 24hr progress
+                          SizedBox(
+                            width: 186,
+                            height: 186,
+                            child: CircularProgressIndicator(
+                              value: hourProgress,
+                              strokeWidth: 4,
+                              backgroundColor: const Color(0xFF1A1A1A),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                accentColor.withOpacity(0.4),
+                              ),
+                            ),
+                          ),
+                          // center text
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -627,13 +599,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ],
                           ),
                         ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 40),
 
-                  // ── CLOWN BUTTON with pulse animation
+                  // ── CLOWN BUTTON
                   _PulseButton(
                     isRunning: _isRunning,
                     accentColor: accentColor,
@@ -702,11 +674,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             final badge = _badges[index];
                             final isCurrentBadge =
                                 badge['name'] == _currentBadge;
-                            final isUnlocked = _days >= badge['days'];
-                            final badgeAccent = _getBadgeColor(badge['name']);
+                            final isUnlocked = _days >= (badge['days'] as int);
+                            final badgeAccent = getBadgeColor(
+                              badge['name'] as String,
+                            );
 
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
+                            return Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 4,
@@ -742,7 +715,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       ),
                                       child: ClipOval(
                                         child: Image.asset(
-                                          badge['image'],
+                                          badge['image'] as String,
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, __, ___) => Icon(
                                             Icons.person,
@@ -760,7 +733,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          badge['name'],
+                                          badge['name'] as String,
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
@@ -844,11 +817,25 @@ class _PulseButtonState extends State<_PulseButton>
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+    );
     _pulseAnim = Tween<double>(
       begin: 1.0,
-      end: 1.12,
+      end: 1.1,
     ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
+
+    if (widget.isRunning) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_PulseButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // start/stop pulse when isRunning changes
+    if (widget.isRunning && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!widget.isRunning && _pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 1.0;
+    }
   }
 
   @override
@@ -863,12 +850,10 @@ class _PulseButtonState extends State<_PulseButton>
       onTap: widget.onTap,
       child: AnimatedBuilder(
         animation: _pulseAnim,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: widget.isRunning ? _pulseAnim.value : 1.0,
-            child: child,
-          );
-        },
+        builder: (context, child) => Transform.scale(
+          scale: widget.isRunning ? _pulseAnim.value : 1.0,
+          child: child,
+        ),
         child: Container(
           width: 80,
           height: 80,
@@ -881,17 +866,6 @@ class _PulseButtonState extends State<_PulseButton>
                   : const Color(0xFF39FF14),
               width: 2.5,
             ),
-            boxShadow: [
-              BoxShadow(
-                color:
-                    (widget.isRunning
-                            ? const Color(0xFFFF3131)
-                            : const Color(0xFF39FF14))
-                        .withOpacity(0.3),
-                blurRadius: 16,
-                spreadRadius: 2,
-              ),
-            ],
           ),
           child: ClipOval(
             child: Image.asset(
@@ -932,6 +906,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _loadHistory() async {
     final data = await _service.loadHistory();
+    if (!mounted) return;
     setState(() => _history = data);
   }
 
@@ -977,31 +952,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _formatDate(DateTime dt) => '${dt.day}/${dt.month}/${dt.year}';
-
-  Color _getBadgeColor(String badge) {
-    switch (badge) {
-      case 'Absolute Giga Chad':
-        return const Color(0xFF00BFFF);
-      case 'Giga Chad':
-        return const Color(0xFF39FF14);
-      case 'Absolute Chad':
-        return const Color(0xFFFF9500);
-      case 'Chad':
-        return const Color(0xFFFFD700);
-      case 'Sigma':
-        return const Color(0xFF4A9EFF);
-      case 'Advanced':
-        return const Color(0xFFC0C0C0);
-      case 'Average':
-        return const Color(0xFFCD7F32);
-      case 'Novice':
-        return const Color(0xFFAAAAAA);
-      case 'Noob':
-        return const Color(0xFF888888);
-      default:
-        return const Color(0xFFFF3131);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1057,7 +1007,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 itemBuilder: (context, index) {
                   final entry = _history[index];
                   final badgeImage = _service.getBadgeImage(entry.badgeName);
-                  final color = _getBadgeColor(entry.badgeName);
+                  final color = getBadgeColor(entry.badgeName);
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
