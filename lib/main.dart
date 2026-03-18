@@ -95,6 +95,7 @@ String getDailyQuote() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
+  // await NotificationService.showInstant();
   await NotificationService.scheduleDailyQuote(
     quote: getDailyQuote(),
     hour: 8, // 8:00 AM — change this to whatever time you want
