@@ -1144,11 +1144,100 @@ class _HistoryScreenState extends State<HistoryScreen> {
               onRefresh: _loadHistory,
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: _history.length,
+                itemCount: _history.length + 1, // +1 for the stats header
                 itemBuilder: (context, index) {
-                  final entry = _history[index];
+                  // ── STATS HEADER (index 0)
+                  if (index == 0) {
+                    final best = _history
+                        .map((e) => e.daysReached)
+                        .reduce((a, b) => a > b ? a : b);
+                    final total = _history.length;
+                    final avg =
+                        (_history
+                                    .map((e) => e.daysReached)
+                                    .reduce((a, b) => a + b) /
+                                total)
+                            .toStringAsFixed(1);
+                    final bestEntry = _history.firstWhere(
+                      (e) => e.daysReached == best,
+                    );
+                    final bestColor = getBadgeColor(bestEntry.badgeName);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D0D0D),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: bestColor.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.emoji_events,
+                                color: bestColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Personal Best',
+                                style: TextStyle(
+                                  color: bestColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StatBox(
+                                  label: 'Best Streak',
+                                  value: '$best days',
+                                  color: bestColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatBox(
+                                  label: 'Total Attempts',
+                                  value: '$total',
+                                  color: const Color(0xFF444444),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatBox(
+                                  label: 'Avg Streak',
+                                  value: '$avg d',
+                                  color: const Color(0xFF444444),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // ── HISTORY ENTRIES (index 1+)
+                  final entry = _history[index - 1];
                   final badgeImage = _service.getBadgeImage(entry.badgeName);
                   final color = getBadgeColor(entry.badgeName);
+                  final isBest =
+                      entry.daysReached ==
+                      _history
+                          .map((e) => e.daysReached)
+                          .reduce((a, b) => a > b ? a : b);
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
@@ -1157,7 +1246,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: const Color(0xFF0D0D0D),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFF1A1A1A),
+                        color: isBest
+                            ? color.withOpacity(0.4)
+                            : const Color(0xFF1A1A1A),
                         width: 1,
                       ),
                     ),
@@ -1177,7 +1268,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Image.asset(
                               badgeImage,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
+                              errorBuilder: (_, __, ___) =>
                                   Icon(Icons.person, color: color, size: 26),
                             ),
                           ),
@@ -1197,7 +1288,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       color: color,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 7,
@@ -1216,6 +1307,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ),
                                     ),
                                   ),
+                                  if (isBest) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFFFFD700,
+                                        ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        '🏆 best',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFFFFD700),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 3),
@@ -1246,6 +1360,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 },
               ),
             ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatBox({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF1E1E1E)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: color == const Color(0xFF444444) ? Colors.white : color,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF444444),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
