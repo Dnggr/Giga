@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'streak_service.dart';
 import 'streak_model.dart';
+import 'notification_service.dart';
 
 Color getBadgeColor(String badge) {
   switch (badge) {
@@ -91,7 +92,14 @@ String getDailyQuote() {
   return _motivationalQuotes[dayOfYear % _motivationalQuotes.length];
 }
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+  await NotificationService.scheduleDailyQuote(
+    quote: getDailyQuote(),
+    hour: 8, // 8:00 AM — change this to whatever time you want
+    minute: 0,
+  );
   runApp(const MyApp());
 }
 
