@@ -991,8 +991,8 @@ class _PulseButtonState extends State<_PulseButton>
           child: child,
         ),
         child: Container(
-          width: 88,
-          height: 88,
+          width: 64,
+          height: 64,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: const Color(0xFF111111),
