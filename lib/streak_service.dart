@@ -110,6 +110,8 @@ class StreakService {
   // ── GET badge image path
   String getBadgeImage(String badgeName) {
     switch (badgeName) {
+      case 'Absolute Giga Chad':
+        return 'assets/badges/absolute_giga_chad.png';
       case 'Giga Chad':
         return 'assets/badges/giga_chad.png';
       case 'Absolute Chad':
