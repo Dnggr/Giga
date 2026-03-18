@@ -95,7 +95,8 @@ class StreakService {
 
   // ── GET current badge based on days
   String getCurrentBadge(int days) {
-    if (days >= 90) return 'Giga Chad';
+    if (days >= 365) return 'Absolute Giga Chad';
+    if (days >= 120) return 'Giga Chad';
     if (days >= 60) return 'Absolute Chad';
     if (days >= 45) return 'Chad';
     if (days >= 30) return 'Sigma';
