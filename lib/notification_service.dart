@@ -78,24 +78,24 @@ class NotificationService {
     );
   }
 
-  // // ── INSTANT NOTIFICATION (test)
-  // static Future<void> showInstant() async {
-  //   await _plugin.show(
-  //     1,
-  //     'Gooner Detected 🤡',
-  //     'Put that phone down and stay strong.',
-  //     const NotificationDetails(
-  //       android: AndroidNotificationDetails(
-  //         'instant_channel',
-  //         'Instant',
-  //         channelDescription: 'Instant notifications',
-  //         importance: Importance.high,
-  //         priority: Priority.high,
-  //         icon: '@mipmap/ic_launcher',
-  //       ),
-  //     ),
-  //   );
-  // }
+  // ── INSTANT NOTIFICATION (test)
+  static Future<void> showInstant() async {
+    await _plugin.show(
+      1,
+      'Gooner Detected 🤡',
+      'Put that phone down and stay strong.',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'instant_channel',
+          'Instant',
+          channelDescription: 'Instant notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+    );
+  }
 
   // ── CANCEL ALL
   static Future<void> cancelAll() async {

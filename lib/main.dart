@@ -94,13 +94,17 @@ String getDailyQuote() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
-  // await NotificationService.showInstant();
-  await NotificationService.scheduleDailyQuote(
-    quote: getDailyQuote(),
-    hour: 8, // 8:00 AM — change this to whatever time you want
-    minute: 0,
-  );
+  try {
+    await NotificationService.init();
+    await NotificationService.showInstant();
+    await NotificationService.scheduleDailyQuote(
+      quote: getDailyQuote(),
+      hour: 8,
+      minute: 0,
+    );
+  } catch (e) {
+    print('Notification error: $e');
+  }
   runApp(const MyApp());
 }
 
