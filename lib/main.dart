@@ -23,6 +23,12 @@ class MyApp extends StatelessWidget {
           primary: Color(0xFF39FF14),
           surface: Color(0xFF111111),
         ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
       home: const MainScreen(),
     );
@@ -39,17 +45,24 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final _historyKey = GlobalKey<_HistoryScreenState>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: const [HomeScreen(), HistoryScreen()],
+        children: [
+          HomeScreen(onRelapse: () => _historyKey.currentState?._loadHistory()),
+          HistoryScreen(key: _historyKey),
+        ],
       ),
       bottomNavigationBar: _AnimatedNavBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) {
+          if (i == 1) _historyKey.currentState?._loadHistory();
+          setState(() => _currentIndex = i);
+        },
       ),
     );
   }
@@ -66,7 +79,10 @@ class _AnimatedNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 64,
-      color: const Color(0xFF111111),
+      decoration: const BoxDecoration(
+        color: Color(0xFF111111),
+        border: Border(top: BorderSide(color: Color(0xFF1E1E1E))),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -110,11 +126,13 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF39FF14).withValues(alpha: 0.1)
+              ? const Color(0xFF39FF14).withOpacity(0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
         ),
@@ -154,14 +172,14 @@ class _NavItem extends StatelessWidget {
 
 // ─── HOME SCREEN ───────────────────────────────────────────────────
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onRelapse;
+  const HomeScreen({super.key, this.onRelapse});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _service = StreakService();
   Timer? _timer;
 
@@ -173,11 +191,22 @@ class _HomeScreenState extends State<HomeScreen>
   int _minutes = 0;
   int _seconds = 0;
   String _currentBadge = 'Clown';
+  String _previousBadge = 'Clown';
 
-  // side panel
+  // panel animation
   late AnimationController _panelController;
   late Animation<Offset> _panelSlide;
   bool _panelOpen = false;
+
+  // badge unlock animation
+  late AnimationController _badgeController;
+  late Animation<double> _badgeScale;
+  late Animation<double> _badgeFade;
+
+  // ring animation
+  late AnimationController _ringController;
+  late Animation<double> _ringValue;
+  double _targetProgress = 0;
 
   final List<Map<String, dynamic>> _badges = [
     {'name': 'Clown', 'days': 0, 'image': 'assets/badges/clown.png'},
@@ -203,8 +232,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _loadStreak();
 
+    // panel
     _panelController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -213,6 +242,43 @@ class _HomeScreenState extends State<HomeScreen>
         .animate(
           CurvedAnimation(parent: _panelController, curve: Curves.easeInOut),
         );
+
+    // badge unlock
+    _badgeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _badgeScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _badgeController, curve: Curves.elasticOut),
+    );
+    _badgeFade = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _badgeController, curve: Curves.easeIn));
+
+    // ring
+    _ringController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _ringValue = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _ringController, curve: Curves.easeOut));
+
+    _badgeController.forward();
+    _loadStreak();
+  }
+
+  void _animateRingTo(double target) {
+    final current = _ringValue.value;
+    _ringValue = Tween<double>(
+      begin: current,
+      end: target,
+    ).animate(CurvedAnimation(parent: _ringController, curve: Curves.easeOut));
+    _ringController
+      ..reset()
+      ..forward();
   }
 
   void _openPanel() {
@@ -241,12 +307,32 @@ class _HomeScreenState extends State<HomeScreen>
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_startTime == null) return;
       final diff = DateTime.now().difference(_startTime!);
+      final newDays = diff.inDays;
+      final newBadge = _service.getCurrentBadge(newDays);
+      final newProgress = newDays >= 365
+          ? 1.0
+          : (newDays / 365).clamp(0.0, 1.0);
+
+      // badge unlock animation
+      if (newBadge != _currentBadge) {
+        _previousBadge = _currentBadge;
+        _badgeController
+          ..reset()
+          ..forward();
+      }
+
+      // ring animation only when progress changes
+      if (newProgress != _targetProgress) {
+        _targetProgress = newProgress;
+        _animateRingTo(_targetProgress);
+      }
+
       setState(() {
-        _days = diff.inDays;
+        _days = newDays;
         _hours = diff.inHours % 24;
         _minutes = diff.inMinutes % 60;
         _seconds = diff.inSeconds % 60;
-        _currentBadge = _service.getCurrentBadge(_days);
+        _currentBadge = newBadge;
       });
     });
   }
@@ -257,7 +343,16 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _isRunning = true;
       _startTime = start;
+      _days = 0;
+      _hours = 0;
+      _minutes = 0;
+      _seconds = 0;
+      _currentBadge = 'Clown';
     });
+    _badgeController
+      ..reset()
+      ..forward();
+    _animateRingTo(0);
     _startTicking();
   }
 
@@ -267,8 +362,6 @@ class _HomeScreenState extends State<HomeScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           '🤡 You became a Clown again?',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -283,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 16),
             TextField(
               controller: noteController,
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Add a note (optional)',
                 hintStyle: const TextStyle(color: Colors.grey),
@@ -332,6 +426,11 @@ class _HomeScreenState extends State<HomeScreen>
         _currentBadge = 'Clown';
         _startTime = null;
       });
+      _animateRingTo(0);
+      _badgeController
+        ..reset()
+        ..forward();
+      widget.onRelapse?.call();
     }
   }
 
@@ -339,14 +438,42 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _timer?.cancel();
     _panelController.dispose();
+    _badgeController.dispose();
+    _ringController.dispose();
     super.dispose();
+  }
+
+  // badge ring color based on rank
+  Color _getBadgeColor(String badge) {
+    switch (badge) {
+      case 'Absolute Giga Chad':
+        return const Color(0xFF00BFFF);
+      case 'Giga Chad':
+        return const Color(0xFF39FF14);
+      case 'Absolute Chad':
+        return const Color(0xFFFF9500);
+      case 'Chad':
+        return const Color(0xFFFFD700);
+      case 'Sigma':
+        return const Color(0xFF4A9EFF);
+      case 'Advanced':
+        return const Color(0xFFC0C0C0);
+      case 'Average':
+        return const Color(0xFFCD7F32);
+      case 'Novice':
+        return const Color(0xFFAAAAAA);
+      case 'Noob':
+        return const Color(0xFF888888);
+      default:
+        return const Color(0xFFFF3131);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final badgeImage = _service.getBadgeImage(_currentBadge);
-    final progress = _days >= 365 ? 1.0 : (_days / 365).clamp(0.0, 1.0);
     final screenWidth = MediaQuery.of(context).size.width;
+    final accentColor = _getBadgeColor(_currentBadge);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
@@ -361,8 +488,8 @@ class _HomeScreenState extends State<HomeScreen>
           'DONT GOON, YOU FUCKING GOONER',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            fontSize: 13,
-            letterSpacing: 1.2,
+            fontSize: 12,
+            letterSpacing: 1.0,
             color: Colors.white,
             fontStyle: FontStyle.italic,
           ),
@@ -371,161 +498,169 @@ class _HomeScreenState extends State<HomeScreen>
 
       body: Stack(
         children: [
-          // ── MAIN CONTENT (centered)
+          // ── MAIN CONTENT
           Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // BADGE CARD
-                Container(
-                  width: 220,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // ── BADGE CARD with unlock animation
+                  FadeTransition(
+                    opacity: _badgeFade,
+                    child: ScaleTransition(
+                      scale: _badgeScale,
+                      child: Container(
+                        width: 220,
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(0xFF39FF14),
-                            width: 2,
+                            color: accentColor.withOpacity(0.3),
+                            width: 1,
                           ),
-                          color: const Color(0xFF111111),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withOpacity(0.1),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            badgeImage,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.person,
-                              size: 48,
-                              color: Colors.grey,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: accentColor,
+                                  width: 2.5,
+                                ),
+                                color: const Color(0xFF111111),
+                              ),
+                              child: ClipOval(
+                                child: Image.asset(
+                                  badgeImage,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: accentColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _currentBadge,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: accentColor,
+                              ),
+                            ),
+                            const Text(
+                              'Current Badge',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // ── ANIMATED CIRCULAR TIMER
+                  AnimatedBuilder(
+                    animation: _ringValue,
+                    builder: (context, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: CircularProgressIndicator(
+                              value: _ringValue.value,
+                              strokeWidth: 6,
+                              backgroundColor: const Color(0xFF222222),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                accentColor,
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _currentBadge,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Text(
-                        'Current Badge',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // CIRCULAR TIMER
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 200,
-                      height: 200,
-                      child: CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 6,
-                        backgroundColor: const Color(0xFF222222),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF39FF14),
-                        ),
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$_days',
-                          style: const TextStyle(
-                            fontSize: 64,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            height: 1,
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_days',
+                                style: const TextStyle(
+                                  fontSize: 64,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1,
+                                ),
+                              ),
+                              const Text(
+                                'Days',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${_hours.toString().padLeft(2, '0')}:${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 18,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const Text(
-                          'Days',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${_hours.toString().padLeft(2, '0')}:${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 18,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 40),
-
-                // CLOWN BUTTON
-                GestureDetector(
-                  onTap: _isRunning ? _handleRelapse : _handleStart,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1A1A1A),
-                      border: Border.all(
-                        color: _isRunning
-                            ? const Color(0xFFFF3131)
-                            : const Color(0xFF39FF14),
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/badges/clown.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          _isRunning ? Icons.stop : Icons.play_arrow,
-                          color: _isRunning
-                              ? const Color(0xFFFF3131)
-                              : const Color(0xFF39FF14),
-                          size: 36,
-                        ),
-                      ),
-                    ),
+                        ],
+                      );
+                    },
                   ),
-                ),
 
-                const SizedBox(height: 12),
-                Text(
-                  _isRunning ? 'Tap to relapse 🤡' : 'Tap to start',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-              ],
+                  const SizedBox(height: 40),
+
+                  // ── CLOWN BUTTON with pulse animation
+                  _PulseButton(
+                    isRunning: _isRunning,
+                    accentColor: accentColor,
+                    badgeImage: 'assets/badges/clown.png',
+                    onTap: _isRunning ? _handleRelapse : _handleStart,
+                  ),
+
+                  const SizedBox(height: 12),
+                  Text(
+                    _isRunning ? 'Tap to relapse 🤡' : 'Tap to start',
+                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
 
-          // ── DARK OVERLAY when panel open
+          // ── OVERLAY
           if (_panelOpen)
             GestureDetector(
               onTap: _closePanel,
               child: Container(color: Colors.black.withOpacity(0.5)),
             ),
 
-          // ── SLIDING BADGE PANEL (75% width)
+          // ── SLIDING BADGE PANEL
           SlideTransition(
             position: _panelSlide,
             child: Align(
@@ -538,7 +673,6 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Panel header
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
                         child: Row(
@@ -560,8 +694,6 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                       const Divider(color: Color(0xFF222222)),
-
-                      // Badge list
                       Expanded(
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -571,8 +703,10 @@ class _HomeScreenState extends State<HomeScreen>
                             final isCurrentBadge =
                                 badge['name'] == _currentBadge;
                             final isUnlocked = _days >= badge['days'];
+                            final badgeAccent = _getBadgeColor(badge['name']);
 
-                            return Container(
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 4,
@@ -583,23 +717,17 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: isCurrentBadge
-                                    ? const Color(
-                                        0xFF39FF14,
-                                      ).withValues(alpha: 0.1)
+                                    ? badgeAccent.withOpacity(0.1)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                                 border: isCurrentBadge
-                                    ? Border.all(
-                                        color: const Color(0xFF39FF14),
-                                        width: 1,
-                                      )
+                                    ? Border.all(color: badgeAccent, width: 1)
                                     : null,
                               ),
                               child: Row(
                                 children: [
-                                  // badge image
                                   Opacity(
-                                    opacity: isUnlocked ? 1.0 : 0.3,
+                                    opacity: isUnlocked ? 1.0 : 0.25,
                                     child: Container(
                                       width: 48,
                                       height: 48,
@@ -607,7 +735,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: isCurrentBadge
-                                              ? const Color(0xFF39FF14)
+                                              ? badgeAccent
                                               : const Color(0xFF333333),
                                           width: 1.5,
                                         ),
@@ -616,18 +744,16 @@ class _HomeScreenState extends State<HomeScreen>
                                         child: Image.asset(
                                           badge['image'],
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                Icons.person,
-                                                color: Colors.grey,
-                                                size: 24,
-                                              ),
+                                          errorBuilder: (_, __, ___) => Icon(
+                                            Icons.person,
+                                            color: badgeAccent,
+                                            size: 24,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  // badge info
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -636,7 +762,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         Text(
                                           badge['name'],
                                           style: TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w600,
                                             color: isUnlocked
                                                 ? Colors.white
@@ -654,15 +780,21 @@ class _HomeScreenState extends State<HomeScreen>
                                     ),
                                   ),
                                   if (isCurrentBadge)
-                                    const Icon(
+                                    Icon(
                                       Icons.check_circle,
-                                      color: Color(0xFF39FF14),
+                                      color: badgeAccent,
                                       size: 18,
                                     ),
                                   if (!isUnlocked && !isCurrentBadge)
                                     const Icon(
                                       Icons.lock,
                                       color: Colors.grey,
+                                      size: 16,
+                                    ),
+                                  if (isUnlocked && !isCurrentBadge)
+                                    const Icon(
+                                      Icons.check,
+                                      color: Colors.green,
                                       size: 16,
                                     ),
                                 ],
@@ -683,7 +815,104 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ─── HISTORY SCREEN (placeholder) ─────────────────────────────────
+// ─── PULSE BUTTON ──────────────────────────────────────────────────
+class _PulseButton extends StatefulWidget {
+  final bool isRunning;
+  final Color accentColor;
+  final String badgeImage;
+  final VoidCallback onTap;
+
+  const _PulseButton({
+    required this.isRunning,
+    required this.accentColor,
+    required this.badgeImage,
+    required this.onTap,
+  });
+
+  @override
+  State<_PulseButton> createState() => _PulseButtonState();
+}
+
+class _PulseButtonState extends State<_PulseButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulse;
+  late Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.12,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _pulseAnim,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: widget.isRunning ? _pulseAnim.value : 1.0,
+            child: child,
+          );
+        },
+        child: Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF1A1A1A),
+            border: Border.all(
+              color: widget.isRunning
+                  ? const Color(0xFFFF3131)
+                  : const Color(0xFF39FF14),
+              width: 2.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    (widget.isRunning
+                            ? const Color(0xFFFF3131)
+                            : const Color(0xFF39FF14))
+                        .withOpacity(0.3),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: Image.asset(
+              widget.badgeImage,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Icon(
+                widget.isRunning ? Icons.stop : Icons.play_arrow,
+                color: widget.isRunning
+                    ? const Color(0xFFFF3131)
+                    : const Color(0xFF39FF14),
+                size: 36,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── HISTORY SCREEN ────────────────────────────────────────────────
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -710,8 +939,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Clean history?',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -749,8 +976,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  String _formatDate(DateTime dt) {
-    return '${dt.day}/${dt.month}/${dt.year}';
+  String _formatDate(DateTime dt) => '${dt.day}/${dt.month}/${dt.year}';
+
+  Color _getBadgeColor(String badge) {
+    switch (badge) {
+      case 'Absolute Giga Chad':
+        return const Color(0xFF00BFFF);
+      case 'Giga Chad':
+        return const Color(0xFF39FF14);
+      case 'Absolute Chad':
+        return const Color(0xFFFF9500);
+      case 'Chad':
+        return const Color(0xFFFFD700);
+      case 'Sigma':
+        return const Color(0xFF4A9EFF);
+      case 'Advanced':
+        return const Color(0xFFC0C0C0);
+      case 'Average':
+        return const Color(0xFFCD7F32);
+      case 'Novice':
+        return const Color(0xFFAAAAAA);
+      case 'Noob':
+        return const Color(0xFF888888);
+      default:
+        return const Color(0xFFFF3131);
+    }
   }
 
   @override
@@ -772,7 +1022,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (_history.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined, color: Colors.grey),
-              tooltip: 'Clear history',
               onPressed: _confirmClearHistory,
             ),
         ],
@@ -808,6 +1057,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 itemBuilder: (context, index) {
                   final entry = _history[index];
                   final badgeImage = _service.getBadgeImage(entry.badgeName);
+                  final color = _getBadgeColor(entry.badgeName);
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -816,20 +1066,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFF222222),
+                        color: color.withOpacity(0.2),
                         width: 1,
                       ),
                     ),
                     child: Row(
                       children: [
-                        // badge image
                         Container(
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF333333),
+                              color: color.withOpacity(0.5),
                               width: 1.5,
                             ),
                           ),
@@ -837,27 +1086,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Image.asset(
                               badgeImage,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person,
-                                color: Colors.grey,
-                                size: 28,
-                              ),
+                              errorBuilder: (_, __, ___) =>
+                                  Icon(Icons.person, color: color, size: 28),
                             ),
                           ),
                         ),
                         const SizedBox(width: 14),
-
-                        // info
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${entry.badgeName} — ${entry.daysReached} Days',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: color,
                                 ),
                               ),
                               const SizedBox(height: 4),
