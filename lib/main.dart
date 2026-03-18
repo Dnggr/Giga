@@ -579,13 +579,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 32),
 
                   // ── DOUBLE RING TIMER using CustomPainter
                   RepaintBoundary(
                     child: SizedBox(
-                      width: 240,
-                      height: 240,
+                      width: 200,
+                      height: 200,
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
