@@ -344,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final badgeImage = _service.getBadgeImage(_currentBadge);
-    final progress = _days >= 90 ? 1.0 : (_days / 90).clamp(0.0, 1.0);
+    final progress = _days >= 365 ? 1.0 : (_days / 365).clamp(0.0, 1.0);
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
