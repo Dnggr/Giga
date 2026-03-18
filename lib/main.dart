@@ -28,6 +28,69 @@ Color getBadgeColor(String badge) {
   }
 }
 
+const List<String> _motivationalQuotes = [
+  "Every day you resist, you become stronger.",
+  "Your future self is watching you right now.",
+  "Discipline is choosing between what you want now and what you want most.",
+  "The man who masters himself is free.",
+  "You are not a slave to your impulses.",
+  "Real strength is controlling what you consume.",
+  "Every streak starts with a single day.",
+  "Pain is temporary. Regret is permanent.",
+  "You don't have to be great to start, but you have to start to be great.",
+  "The hardest walk is alone, but it makes you stronger.",
+  "Stop being a spectator of your own life.",
+  "What you do in private determines who you are in public.",
+  "Weak men wait for opportunities. Strong men make them.",
+  "Your brain is lying to you. Keep going.",
+  "A year from now you'll wish you started today.",
+  "Small daily improvements lead to stunning results.",
+  "You were born to do more than this.",
+  "The body achieves what the mind believes.",
+  "It always seems impossible until it's done.",
+  "Be the man your dog thinks you are.",
+  "Don't count the days. Make the days count.",
+  "The cave you fear to enter holds the treasure you seek.",
+  "Motivation gets you started. Discipline keeps you going.",
+  "Fall seven times, stand up eight.",
+  "A desire, a dream, a vision — that's what champions are made of.",
+  "Hardships prepare ordinary people for an extraordinary destiny.",
+  "Do something today that your future self will thank you for.",
+  "You are the author of your own story.",
+  "The courage to continue is what counts.",
+  "The secret of getting ahead is getting started.",
+  "One day or day one. You decide.",
+  "Conquer yourself and you conquer the world.",
+  "Your addiction is your enemy. Defeat it daily.",
+  "Wake up and chase your dreams.",
+  "The struggle today builds the strength for tomorrow.",
+  "Be so good they can't ignore you.",
+  "The only person you are destined to become is who you decide to be.",
+  "Believe you can and you're halfway there.",
+  "Do not wait — the time will never be just right.",
+  "Act as if what you do makes a difference. It does.",
+  "Success is small efforts repeated day in and day out.",
+  "The harder the battle, the sweeter the victory.",
+  "You have power over your mind — not outside events.",
+  "He who has mastered himself is mightier than any conqueror.",
+  "Excellence is not an act, but a habit.",
+  "No man is free who is not master of himself.",
+  "To conquer oneself is the greatest victory.",
+  "First say what you would be, then do what you have to do.",
+  "You don't rise to your goals. You fall to your systems.",
+  "The best time was 20 years ago. The second best time is now.",
+  "Prove them wrong — especially yourself.",
+  "Your only limit is your mind.",
+  "Stay hard.",
+];
+
+String getDailyQuote() {
+  final dayOfYear = DateTime.now()
+      .difference(DateTime(DateTime.now().year))
+      .inDays;
+  return _motivationalQuotes[dayOfYear % _motivationalQuotes.length];
+}
+
 void main() {
   runApp(const MyApp());
 }
@@ -668,7 +731,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       letterSpacing: 1,
                     ),
                   ),
-
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D0D0D),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF1A1A1A),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          '💬  daily quote',
+                          style: TextStyle(
+                            color: Color(0xFF333333),
+                            fontSize: 10,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '"${getDailyQuote()}"',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: accentColor.withOpacity(0.7),
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            height: 1.6,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 40),
                 ],
               ),
