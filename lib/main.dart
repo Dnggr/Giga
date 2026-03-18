@@ -590,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         alignment: Alignment.center,
                         children: [
                           CustomPaint(
-                            size: const Size(240, 240),
+                            size: const Size(200, 200),
                             painter: _RingPainter(
                               outerProgress: dayProgress,
                               innerProgress: hourProgress,
