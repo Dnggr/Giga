@@ -534,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 Text(
                                   _currentBadge,
                                   style: TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.w700,
                                     color: accentColor,
                                     letterSpacing: 0.3,
