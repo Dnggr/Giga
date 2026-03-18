@@ -191,7 +191,12 @@ class _HomeScreenState extends State<HomeScreen>
       'days': 60,
       'image': 'assets/badges/absolute_chad.png',
     },
-    {'name': 'Giga Chad', 'days': 90, 'image': 'assets/badges/giga_chad.png'},
+    {'name': 'Giga Chad', 'days': 120, 'image': 'assets/badges/giga_chad.png'},
+    {
+      'name': 'Absolute Giga Chad',
+      'days': 365,
+      'image': 'assets/badges/absolute_giga_chad.png',
+    },
   ];
 
   @override
