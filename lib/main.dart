@@ -446,7 +446,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final accentColor = getBadgeColor(_currentBadge);
 
     final dayProgress = _days >= 365 ? 1.0 : (_days / 365).clamp(0.0, 1.0);
-    final hourProgress = _hours / 24.0;
+    // inner ring = progress through current 24hr cycle
+    final totalSeconds = (_startTime != null && _isRunning)
+        ? DateTime.now().difference(_startTime!).inSeconds
+        : 0;
+    final secondsIntoDay = totalSeconds % 86400; // 86400 = 24hrs in seconds
+    final hourProgress = secondsIntoDay / 86400.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
