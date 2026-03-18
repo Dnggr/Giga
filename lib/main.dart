@@ -505,13 +505,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Container(
-                              width: 64,
-                              height: 64,
+                              width: 80,
+                              height: 80,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: accentColor,
-                                  width: 2,
+                                  width: 2.5,
                                 ),
                                 color: const Color(0xFF0A0A0A),
                               ),
