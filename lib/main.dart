@@ -519,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 child: Image.asset(
                                   badgeImage,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Icon(
+                                  errorBuilder: (_, _, _) => Icon(
                                     Icons.person,
                                     size: 32,
                                     color: accentColor,
@@ -775,7 +775,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         child: Image.asset(
                                           badge['image'] as String,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Icon(
+                                          errorBuilder: (_, _, _) => Icon(
                                             Icons.person,
                                             color: badgeAccent,
                                             size: 22,
@@ -1007,7 +1007,7 @@ class _PulseButtonState extends State<_PulseButton>
             child: Image.asset(
               widget.badgeImage,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
+              errorBuilder: (_, _, _) => Icon(
                 widget.isRunning ? Icons.stop : Icons.play_arrow,
                 color: widget.isRunning
                     ? const Color(0xFFFF3131)
@@ -1177,7 +1177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Image.asset(
                               badgeImage,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   Icon(Icons.person, color: color, size: 26),
                             ),
                           ),
